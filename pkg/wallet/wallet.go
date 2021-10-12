@@ -92,6 +92,24 @@ func (w *Wallet) Address() string {
 	return w.addr
 }
 
+func (w *Wallet) initByMnemonic(mnemonic string) error {
+	w.mnemonic = mnemonic
+	pri, err := genKey(mnemonic)
+	if err != nil {
+		return err
+	}
+	w.private = pri
+	w.addr = genAddr(w.private)
+	if len(w.name) == 0 {
+		w.name = w.addr
+	}
+	err = w.store()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // CreateWallet ..
 func CreateWallet(keystore KeyStore, name string) (*Wallet, error) {
 	w := &Wallet{
@@ -99,17 +117,7 @@ func CreateWallet(keystore KeyStore, name string) (*Wallet, error) {
 		name:     name,
 	}
 	mnemonic := genMnemonic()
-	w.mnemonic = mnemonic
-	pri, err := genKey(mnemonic)
-	if err != nil {
-		return nil, err
-	}
-	w.private = pri
-	w.addr = genAddr(w.private)
-	if len(name) == 0 {
-		w.name = w.addr
-	}
-	err = w.store()
+	err := w.initByMnemonic(mnemonic)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +145,19 @@ func LoadWallet(keystore KeyStore, name string) (*Wallet, error) {
 		mnemonic: sec.Mnemonic,
 		addr:     genAddr(pri),
 		name:     name,
+	}
+	return w, nil
+}
+
+// RecoverWallet ...
+func RecoverWallet(keystore KeyStore, name string, mnemonic string) (*Wallet, error) {
+	w := &Wallet{
+		KeyStore: keystore,
+		name:     name,
+	}
+	err := w.initByMnemonic(mnemonic)
+	if err != nil {
+		return nil, err
 	}
 	return w, nil
 }
