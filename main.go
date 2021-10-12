@@ -16,4 +16,15 @@ func main() {
 
 	fmt.Println(w.ShowMnemonic())
 	fmt.Println(w.Address())
+
+	sig, err := w.Sign([]byte("hello world"))
+	if err != nil {
+		panic(err)
+	}
+
+	res, err := w.Verify(sig, []byte("hello world"))
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("sig is ", res)
 }

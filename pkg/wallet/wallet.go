@@ -4,12 +4,17 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tyler-smith/go-bip39"
 	"github.com/tyler-smith/go-bip39/wordlists"
+
+	"bewallet/internal/fabric/bccsp/utils"
 )
 
 // Secret ..
@@ -27,14 +32,38 @@ type Wallet struct {
 	name     string
 }
 
-// Sign 私钥签名
+// Sign 私钥签名 (fabric 签名)
 func (w *Wallet) Sign(data []byte) ([]byte, error) {
-	return nil, nil
+	ri, si, err := ecdsa.Sign(rand.Reader, w.private, digest(data))
+	if err != nil {
+		return nil, err
+	}
+
+	si, _, err = utils.ToLowS(&w.private.PublicKey, si)
+	if err != nil {
+		return nil, err
+	}
+	return utils.MarshalECDSASignature(ri, si)
 }
 
 // Verify 签名验证
-func (w *Wallet) Verify(data []byte) bool {
-	return false
+func (w *Wallet) Verify(sig []byte, data []byte) (bool, error) {
+
+	r, s, err := utils.UnmarshalECDSASignature(sig)
+	if err != nil {
+		return false, fmt.Errorf("Failed unmashalling signature [%s]", err)
+	}
+
+	lowS, err := utils.IsLowS(&w.private.PublicKey, s)
+	if err != nil {
+		return false, err
+	}
+
+	if !lowS {
+		return false, fmt.Errorf("Invalid S. Must be smaller than half the order [%s][%s]", s, utils.GetCurveHalfOrdersAt(w.private.PublicKey.Curve))
+	}
+
+	return ecdsa.Verify(&w.private.PublicKey, digest(data), r, s), nil
 }
 
 func (w *Wallet) store() error {
@@ -57,6 +86,8 @@ func (w *Wallet) store() error {
 func (w *Wallet) ShowMnemonic() string {
 	return w.mnemonic
 }
+
+// Address 地址
 func (w *Wallet) Address() string {
 	return w.addr
 }
@@ -74,11 +105,14 @@ func CreateWallet(keystore KeyStore, name string) (*Wallet, error) {
 		return nil, err
 	}
 	w.private = pri
+	w.addr = genAddr(w.private)
+	if len(name) == 0 {
+		w.name = w.addr
+	}
 	err = w.store()
 	if err != nil {
 		return nil, err
 	}
-	w.addr = genAddr(w.private)
 	return w, nil
 }
 
@@ -127,4 +161,10 @@ func genKey(mnemonic string) (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 	return pri, nil
+}
+
+func digest(in []byte) []byte {
+	h := sha256.New()
+	h.Write(in)
+	return h.Sum(nil)
 }
