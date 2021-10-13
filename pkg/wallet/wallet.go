@@ -10,11 +10,17 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tyler-smith/go-bip39"
 	"github.com/tyler-smith/go-bip39/wordlists"
 
 	"bewallet/internal/fabric/bccsp/utils"
+)
+
+var (
+	// Curve 椭圆曲线
+	Curve = elliptic.P256()
 )
 
 // Secret ..
@@ -146,6 +152,7 @@ func LoadWallet(keystore KeyStore, name string) (*Wallet, error) {
 		addr:     genAddr(pri),
 		name:     name,
 	}
+
 	return w, nil
 }
 
@@ -163,7 +170,25 @@ func RecoverWallet(keystore KeyStore, name string, mnemonic string) (*Wallet, er
 }
 
 func genAddr(pri *ecdsa.PrivateKey) string {
-	return crypto.PubkeyToAddress(pri.PublicKey).String()
+	pubBytes := crypto.FromECDSAPub(&pri.PublicKey)
+	fmt.Println(len(pubBytes))
+	fmt.Printf("0x%2x\n", crypto.Keccak256(pubBytes[1:]))
+
+	return publicToAddress(&pri.PublicKey) // 与以太坊的 crypto.PubkeyToAddress() 等同
+	// return crypto.PubkeyToAddress(pri.PublicKey).String()
+}
+
+func publicToAddress(pub *ecdsa.PublicKey) string {
+	pubBytes := fromECDSAPub(pub)
+	addr := common.BytesToAddress(crypto.Keccak256(pubBytes[1:])[12:])
+	return addr.String()
+}
+
+func fromECDSAPub(pub *ecdsa.PublicKey) []byte {
+	if pub == nil || pub.X == nil || pub.Y == nil {
+		return nil
+	}
+	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 }
 
 func genMnemonic() string {
@@ -176,7 +201,7 @@ func genMnemonic() string {
 func genKey(mnemonic string) (*ecdsa.PrivateKey, error) {
 	seed := bip39.NewSeed(mnemonic, "")
 	buf := bytes.NewBuffer(seed)
-	pri, err := ecdsa.GenerateKey(elliptic.P256(), buf) // secp256r1
+	pri, err := ecdsa.GenerateKey(Curve, buf) // secp256r1
 	// pri, err := ecdsa.GenerateKey(crypto.S256(), buf) // secp256k1 golang 不支持
 	if err != nil {
 		return nil, err
