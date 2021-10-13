@@ -98,6 +98,11 @@ func (w *Wallet) Address() string {
 	return w.addr
 }
 
+// PublicKey 返回钱包公钥
+func (w *Wallet) PublicKey() *ecdsa.PublicKey {
+	return &w.private.PublicKey
+}
+
 func (w *Wallet) initByMnemonic(mnemonic string) error {
 	w.mnemonic = mnemonic
 	pri, err := genKey(mnemonic)
@@ -170,9 +175,9 @@ func RecoverWallet(keystore KeyStore, name string, mnemonic string) (*Wallet, er
 }
 
 func genAddr(pri *ecdsa.PrivateKey) string {
-	pubBytes := crypto.FromECDSAPub(&pri.PublicKey)
-	fmt.Println(len(pubBytes))
-	fmt.Printf("0x%2x\n", crypto.Keccak256(pubBytes[1:]))
+	// pubBytes := crypto.FromECDSAPub(&pri.PublicKey)
+	// fmt.Println(len(pubBytes))
+	// fmt.Printf("0x%2x\n", crypto.Keccak256(pubBytes[1:]))
 
 	return publicToAddress(&pri.PublicKey) // 与以太坊的 crypto.PubkeyToAddress() 等同
 	// return crypto.PubkeyToAddress(pri.PublicKey).String()

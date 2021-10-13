@@ -30,12 +30,17 @@ func NewFilKeyStore(baseDir string, password string) *FileKeyStore {
 
 // Store 密钥持久化 ..
 func (fk *FileKeyStore) Store(name string, key []byte) error {
-	fileName := filepath.Join(fk.baseDir, name+".sec")
+	ad, err := filepath.Abs(fk.baseDir)
+	if err != nil {
+		return err
+	}
+	fileName := filepath.Join(ad, name+".sec")
 	data, err := fk.encrypt(key, fk.password)
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(fk.baseDir, 0766)
+
+	err = os.MkdirAll(ad, 0766)
 	if err != nil {
 		return err
 	}
