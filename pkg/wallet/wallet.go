@@ -15,7 +15,7 @@ import (
 	"github.com/tyler-smith/go-bip39"
 	"github.com/tyler-smith/go-bip39/wordlists"
 
-	"bewallet/internal/fabric/bccsp/utils"
+	"bewallet/pkg/wallet/utils"
 )
 
 var (
