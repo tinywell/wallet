@@ -58,7 +58,10 @@ func create() error {
 		basedir = filepath.Join(userdir, defaultSubBaseDir)
 		fmt.Println("密钥缓存目录:", basedir)
 	}
-	ks := wallet.NewFilKeyStore(basedir, password)
+	ks, err := wallet.NewFilKeyStore(basedir, password)
+	if err != nil {
+		return err
+	}
 	w, err := wallet.CreateWallet(ks, name)
 	if err != nil {
 		return err
