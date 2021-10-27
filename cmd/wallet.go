@@ -1,12 +1,14 @@
 package cmd
 
 import (
-	"bewallet/pkg/wallet"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"bewallet/pkg/keystore"
+	"bewallet/pkg/wallet"
 )
 
 // subcommand name
@@ -58,7 +60,7 @@ func create() error {
 		basedir = filepath.Join(userdir, defaultSubBaseDir)
 		fmt.Println("密钥缓存目录:", basedir)
 	}
-	ks, err := wallet.NewFilKeyStore(basedir, password)
+	ks, err := keystore.NewFilKeyStore(basedir, password)
 	if err != nil {
 		return err
 	}

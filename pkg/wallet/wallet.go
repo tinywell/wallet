@@ -15,7 +15,8 @@ import (
 	"github.com/tyler-smith/go-bip39"
 	"github.com/tyler-smith/go-bip39/wordlists"
 
-	"bewallet/pkg/wallet/utils"
+	"bewallet/pkg/keystore"
+	"bewallet/pkg/utils"
 )
 
 var (
@@ -31,7 +32,7 @@ type Secret struct {
 
 // Wallet .
 type Wallet struct {
-	KeyStore
+	keystore.KeyStore
 	private  *ecdsa.PrivateKey
 	mnemonic string
 	addr     string
@@ -85,7 +86,11 @@ func (w *Wallet) store() error {
 	if err != nil {
 		return err
 	}
-	return w.Store(w.name, secRaw)
+	opt := &keystore.SecretStoreOpt{
+		Content: secRaw,
+		Name:    w.name,
+	}
+	return w.Store(opt)
 }
 
 // ShowMnemonic 展示助记词
@@ -122,7 +127,7 @@ func (w *Wallet) initByMnemonic(mnemonic string) error {
 }
 
 // CreateWallet ..
-func CreateWallet(keystore KeyStore, name string) (*Wallet, error) {
+func CreateWallet(keystore keystore.KeyStore, name string) (*Wallet, error) {
 	w := &Wallet{
 		KeyStore: keystore,
 		name:     name,
@@ -136,8 +141,11 @@ func CreateWallet(keystore KeyStore, name string) (*Wallet, error) {
 }
 
 // LoadWallet ..
-func LoadWallet(keystore KeyStore, name string) (*Wallet, error) {
-	secRaw, err := keystore.Load(name)
+func LoadWallet(ks keystore.KeyStore, name string) (*Wallet, error) {
+	opt := &keystore.SecretLoadOpt{
+		Name: name,
+	}
+	secRaw, err := ks.Load(opt)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +159,7 @@ func LoadWallet(keystore KeyStore, name string) (*Wallet, error) {
 		return nil, err
 	}
 	w := &Wallet{
-		KeyStore: keystore,
+		KeyStore: ks,
 		private:  pri,
 		mnemonic: sec.Mnemonic,
 		addr:     genAddr(pri),
@@ -162,9 +170,9 @@ func LoadWallet(keystore KeyStore, name string) (*Wallet, error) {
 }
 
 // RecoverWallet ...
-func RecoverWallet(keystore KeyStore, name string, mnemonic string) (*Wallet, error) {
+func RecoverWallet(ks keystore.KeyStore, name string, mnemonic string) (*Wallet, error) {
 	w := &Wallet{
-		KeyStore: keystore,
+		KeyStore: ks,
 		name:     name,
 	}
 	err := w.initByMnemonic(mnemonic)
