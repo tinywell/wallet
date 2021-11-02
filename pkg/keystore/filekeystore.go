@@ -153,6 +153,9 @@ func (fk *FileKeyStore) Load(opt LoadOpts) ([]byte, error) {
 	filePath := filepath.Join(fk.baseDir, opt.Identity(), fileName)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
+		if err == os.ErrNotExist && opt.LoadType() == KeyTypeNetwork {
+			return nil, nil
+		}
 		return nil, err
 	}
 
