@@ -27,9 +27,14 @@ func NewClient(opts ...Option) *Client {
 	if opt.signer == nil {
 		return nil //TODO: return error
 	}
-	return &Client{
+	c := &Client{
 		opt: opt,
 	}
+	err := c.initClients() //TODO:
+	if err != nil {
+		return nil
+	}
+	return c
 }
 
 func (c *Client) initClients() error {
@@ -50,16 +55,21 @@ func (c *Client) initClients() error {
 	return nil
 }
 
-func (c *Client) createProposal(args [][]byte) (*peer.Proposal, *peer.SignedProposal, error) {
+func (c *Client) createProposal(args [][]byte) (*fabProposal, error) {
 	proposal, txid, err := sdk.CreateProposal(c.opt.signer, c.opt.channel, c.opt.chaincode, c.opt.ccVersion, c.opt.ccType, nil, args...)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "构造交易提案失败, txid=%s", txid)
+		return nil, errors.WithMessagef(err, "构造交易提案失败, txid=%s", txid)
 	}
 	signedPropoal, err := sdk.SignProposal(c.opt.signer, proposal)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "提案签名失败, txid=%s", txid)
+		return nil, errors.WithMessagef(err, "提案签名失败, txid=%s", txid)
 	}
-	return proposal, signedPropoal, nil
+	return &fabProposal{
+		txid:       txid,
+		prop:       proposal,
+		signedProp: signedPropoal,
+	}, nil
+	// return proposal, signedPropoal, nil
 }
 
 func (c *Client) createEnvelope(proposal *peer.Proposal, resps ...*peer.ProposalResponse) (*common.Envelope, error) {
@@ -102,22 +112,12 @@ func (c *Client) broadcast(ctx context.Context, env *common.Envelope) error {
 // Invoke 共识交易
 func (c *Client) Invoke(args ...[]byte) ([]byte, error) {
 	// 背书
-
-	// 广播
-
-	// 监听
-
-	return nil, nil
-}
-
-// Query 查询交易
-func (c *Client) Query(args ...[]byte) ([]byte, error) {
-	_, signedProp, err := c.createProposal(args)
+	prop, err := c.createProposal(args)
 	if err != nil {
 		return nil, err
 	}
 	ctx := context.Background()
-	resps, err := c.sendProposal(ctx, signedProp)
+	resps, err := c.sendProposal(ctx, prop.signedProp)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +127,38 @@ func (c *Client) Query(args ...[]byte) ([]byte, error) {
 	resp := resps[0].Response
 	if resp.Status != 200 {
 		return nil, errors.Errorf("查询出错：[状态码 %d] %s", resp.Status, resp.Message)
+	}
+	// 广播
+	env, err := c.createEnvelope(prop.prop, resps...)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "构造交易信封出错,txid=%s", prop.txid)
+	}
+	err = c.broadcast(ctx, env)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "交易广播出错.txid=%s", prop.txid)
+	}
+	// TODO:监听
+
+	return nil, nil
+}
+
+// Query 查询交易
+func (c *Client) Query(args ...[]byte) ([]byte, error) {
+	prop, err := c.createProposal(args)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	resps, err := c.sendProposal(ctx, prop.signedProp)
+	if err != nil {
+		return nil, err
+	}
+	if len(resps) == 0 {
+		return nil, errors.New("未预期异常，交易返回结果为空")
+	}
+	resp := resps[0].Response
+	if resp.Status != 200 {
+		return nil, errors.Errorf("查询出错交易 txid=%s：[状态码 %d] %s", prop.txid, resp.Status, resp.Message)
 	}
 	return resp.Payload, nil
 }
