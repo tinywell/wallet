@@ -110,36 +110,43 @@ func (c *Client) broadcast(ctx context.Context, env *common.Envelope) error {
 }
 
 // Invoke 共识交易
-func (c *Client) Invoke(args ...[]byte) ([]byte, error) {
+func (c *Client) Invoke(args ...[]byte) (peer.TxValidationCode, error) {
 	// 背书
 	prop, err := c.createProposal(args)
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 	ctx := context.Background()
 	resps, err := c.sendProposal(ctx, prop.signedProp)
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 	if len(resps) == 0 {
-		return nil, errors.New("未预期异常，返回结果为空")
+		return -1, errors.New("未预期异常，返回结果为空")
 	}
 	resp := resps[0].Response
 	if resp.Status != 200 {
-		return nil, errors.Errorf("查询出错：[状态码 %d] %s", resp.Status, resp.Message)
+		return -1, errors.Errorf("查询出错：[状态码 %d] %s", resp.Status, resp.Message)
 	}
 	// 广播
 	env, err := c.createEnvelope(prop.prop, resps...)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "构造交易信封出错,txid=%s", prop.txid)
+		return -1, errors.WithMessagef(err, "构造交易信封出错,txid=%s", prop.txid)
 	}
 	err = c.broadcast(ctx, env)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "交易广播出错.txid=%s", prop.txid)
+		return -1, errors.WithMessagef(err, "交易广播出错.txid=%s", prop.txid)
 	}
 	// TODO:监听
-
-	return nil, nil
+	txcli, err := NewTxEvent(c.opt.channel, prop.txid, c.peerClis)
+	if err != nil {
+		return -1, errors.WithMessage(err, "创建交易事件客户端失败")
+	}
+	tx, err := txcli.Listen()
+	if err != nil {
+		return -1, errors.WithMessage(err, "监听交易事件失败")
+	}
+	return tx.TxValidationCode, nil
 }
 
 // Query 查询交易
