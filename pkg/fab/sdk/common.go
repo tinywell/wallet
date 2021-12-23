@@ -102,6 +102,18 @@ func CreateSignedProposal(signer Signer, channel, ccname, version, cctype string
 	return SignProposal(signer, prop)
 }
 
+// CreateEnvelope assembles an Envelope message from proposal, endorsements,
+// and a signer. This function should be called by a client when it has
+// collected enough endorsements for a proposal to create a transaction and
+// submit it to peers for ordering
+func CreateEnvelope(
+	proposal *peer.Proposal,
+	signer Signer,
+	resps ...*peer.ProposalResponse,
+) (*common.Envelope, error) {
+	return utils.CreateSignedTx(proposal, signer, resps...)
+}
+
 // CreateTxSeekInfo 最新交易区块
 func CreateTxSeekInfo() *orderer.SeekInfo {
 	start := &orderer.SeekPosition{
